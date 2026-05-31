@@ -1,40 +1,69 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
+// 安全获取通知权限，绝对兼容所有手机浏览器防卡死
+function getNotifyPermission() {
+  try {
+    if (typeof window === 'undefined' || !('Notification' in window)) return 'denied'
+    return Notification.permission
+  } catch { return 'denied' }
+}
+
+// 移动端安全权限申请函数
 async function requestNotifyPermission() {
-  if (!('Notification' in window)) return false;
-  if (Notification.permission === 'granted') return true;
-  const result = await Notification.requestPermission();
-  return result === 'granted';
+  try {
+    if (typeof window === 'undefined' || !('Notification' in window)) return false
+    if (Notification.permission === 'granted') return true
+    
+    // 兼容老版本浏览器的回调语法与新版 Promise 语法
+    const result = await new Promise((resolve) => {
+      const res = Notification.requestPermission(resolve);
+      if (res && typeof res.then === 'function') {
+        res.then(resolve);
+      }
+    });
+    return result === 'granted'
+  } catch { return false }
 }
 
 function notify(title, body) {
-  if (Notification.permission === 'granted') {
-    new Notification(title, { body, icon: '/favicon.ico' });
-  }
+  try {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/favicon.ico' })
+    }
+  } catch {}
 }
 
 function CreateModal({ username, t, onClose, onSaved }) {
   const [form, setForm] = useState({ restaurant: '', time_slot: '12:00-13:00', max_seats: 5 })
   const [saving, setSaving] = useState(false)
 
+  // 💡 安全获取本地 YYYY-MM-DD
+  const getLocalDateStr = () => {
+    const d = new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${mm}-${dd}`;
+  };
+
   const save = async () => {
     if (!form.restaurant.trim()) return
     setSaving(true)
-    const today = new Date().toISOString().split('T')[0]
     await supabase.from('lunch_groups').insert({
       organizer: username || '匿名',
-      restaurant: form.restaurant,
-      time_slot: form.time_slot,
+      restaurant: form.restaurant.trim(),
+      time_slot: form.time_slot.trim(),
       max_seats: form.max_seats,
-      date: today, followers: [], is_open: true,
+      date: getLocalDateStr(), 
+      followers: [], 
+      is_open: true,
     })
     setSaving(false); onSaved(); onClose()
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: t.dark ? '#1A2A3A' : 'rgba(255,255,255,0.97)', borderRadius: 24, border: '1px solid ' + t.cardBorder, padding: 32, width: 360, display: 'flex', flexDirection: 'column', gap: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: t.dark ? '#1A2A3A' : 'rgba(255,255,255,0.97)', borderRadius: 24, border: '1px solid ' + t.cardBorder, padding: 28, width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
         <h3 style={{ color: t.text, fontWeight: 800, fontSize: 18 }}>🍱 发起午餐组队</h3>
         {[
           { label: '餐厅名称', key: 'restaurant', type: 'text', placeholder: '例：楼下沙县' },
@@ -44,7 +73,7 @@ function CreateModal({ username, t, onClose, onSaved }) {
             <div style={{ color: t.textSub, fontSize: 12, marginBottom: 6, fontWeight: 600 }}>{f.label}</div>
             <input type={f.type} value={form[f.key]} placeholder={f.placeholder}
               onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-              style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: '1px solid ' + t.inputBorder, borderRadius: 10, color: t.inputColor, fontSize: 14 }} />
+              style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: '1px solid ' + t.inputBorder, borderRadius: 10, color: t.inputColor, fontSize: 14, boxSizing: 'border-box' }} />
           </div>
         ))}
         <div>
@@ -78,19 +107,19 @@ function GroupCard({ group, username, t, onFollow, onClose }) {
           <div style={{ color: t.text, fontWeight: 800, fontSize: 17 }}>🍜 {group.restaurant}</div>
           <div style={{ color: t.textSub, fontSize: 13, marginTop: 4 }}>{group.time_slot} · 发起人：{group.organizer}</div>
         </div>
-        <div style={{ background: isFull ? 'rgba(220,38,38,0.1)' : 'rgba(5,150,105,0.1)', border: '1px solid ' + (isFull ? 'rgba(220,38,38,0.2)' : 'rgba(5,150,105,0.2)'), borderRadius: 999, padding: '4px 12px', color: isFull ? '#EF4444' : '#10B981', fontSize: 12, fontWeight: 700 }}>
+        <div style={{ background: isFull ? 'rgba(220,38,38,0.1)' : 'rgba(5,150,105,0.1)', border: '1px solid ' + (isFull ? 'rgba(220,38,38,0.2)' : 'rgba(5,150,105,0.2)'), borderRadius: 999, padding: '4px 10px', color: isFull ? '#EF4444' : '#10B981', fontSize: 12, fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>
           {isFull ? '已满' : '招募中'}
         </div>
       </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ background: t.dark ? 'rgba(255,107,71,0.2)' : 'rgba(255,107,71,0.12)', border: '1px solid rgba(255,107,71,0.3)', borderRadius: 999, padding: '4px 12px', color: t.dark ? '#FF8866' : '#CC4422', fontSize: 13, fontWeight: 700 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ background: t.dark ? 'rgba(255,107,71,0.2)' : 'rgba(255,107,71,0.12)', border: '1px solid rgba(255,107,71,0.3)', borderRadius: 999, padding: '4px 10px', color: t.dark ? '#FF8866' : '#CC4422', fontSize: 12, fontWeight: 700 }}>
           👑 {group.organizer}
         </div>
         {group.followers.map(f => (
-          <div key={f} style={{ background: t.inputBg, borderRadius: 999, padding: '4px 12px', color: t.text, fontSize: 13 }}>{f}</div>
+          <div key={f} style={{ background: t.inputBg, borderRadius: 999, padding: '4px 10px', color: t.text, fontSize: 12 }}>{f}</div>
         ))}
         {Array.from({ length: Math.max(0, group.max_seats - 1 - group.followers.length) }).map((_, i) => (
-          <div key={i} style={{ background: 'transparent', border: '1px dashed ' + t.inputBorder, borderRadius: 999, padding: '4px 12px', color: t.textSub, fontSize: 13, opacity: 0.5 }}>空位</div>
+          <div key={i} style={{ background: 'transparent', border: '1px dashed ' + t.inputBorder, borderRadius: 999, padding: '4px 10px', color: t.textSub, fontSize: 12, opacity: 0.5 }}>空位</div>
         ))}
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
@@ -111,37 +140,56 @@ function GroupCard({ group, username, t, onFollow, onClose }) {
 export function LunchPage({ t }) {
   const [groups, setGroups] = useState([])
   const [showCreate, setShowCreate] = useState(false)
-  const [notifyOn, setNotifyOn] = useState(Notification?.permission === 'granted')
+  const [notifyOn, setNotifyOn] = useState(false)
   const prevGroupsRef = useRef([])
-  const username = localStorage.getItem('ovbu_username') || '匿名'
-  const today = new Date().toISOString().split('T')[0]
+  
+  // 安全容错读取用户名
+  const username = (typeof window !== 'undefined' ? localStorage.getItem('ovbu_username') : '') || '匿名'
+
+  const getLocalDateStr = () => {
+    const d = new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${mm}-${dd}`;
+  };
+
+  useEffect(() => {
+    setNotifyOn(getNotifyPermission() === 'granted')
+  }, [])
 
   const load = async () => {
-    const { data } = await supabase.from('lunch_groups').select('*').eq('date', today).eq('is_open', true).order('created_at', { ascending: false })
-    const newGroups = data || []
-
-    // 检查是否有人加入了我发起的组队
-    if (prevGroupsRef.current.length > 0 && username !== '匿名') {
-      newGroups.forEach(ng => {
-        if (ng.organizer === username) {
-          const prev = prevGroupsRef.current.find(p => p.id === ng.id)
-          if (prev && ng.followers.length > prev.followers.length) {
-            const newFollower = ng.followers[ng.followers.length - 1]
-            notify('🍱 有人加入你的组队！', `${newFollower} 跟随了你去 ${ng.restaurant}`)
+    try {
+      const { data } = await supabase.from('lunch_groups').select('*').eq('date', getLocalDateStr()).eq('is_open', true).order('created_at', { ascending: false })
+      const newGroups = data || []
+      if (prevGroupsRef.current.length > 0 && username !== '匿名') {
+        newGroups.forEach(ng => {
+          if (ng.organizer === username) {
+            const prev = prevGroupsRef.current.find(p => p.id === ng.id)
+            if (prev && ng.followers.length > prev.followers.length) {
+              const newFollower = ng.followers[ng.followers.length - 1]
+              notify('🍱 有人加入你的组队！', `${newFollower} 跟随了你去 ${ng.restaurant}`)
+            }
           }
-        }
-      })
+        })
+      }
+      prevGroupsRef.current = newGroups
+      setGroups(newGroups)
+    } catch (err) {
+      console.error('LunchPage load error:', err)
     }
-    prevGroupsRef.current = newGroups
-    setGroups(newGroups)
   }
 
   useEffect(() => {
     load()
-    const channel = supabase.channel('lunch-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'lunch_groups' }, load)
-      .subscribe()
-    return () => supabase.removeChannel(channel)
+    let channel
+    try {
+      channel = supabase.channel('lunch-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'lunch_groups' }, load)
+        .subscribe()
+    } catch (err) {
+      console.error('Supabase channel error:', err)
+    }
+    return () => { if (channel) supabase.removeChannel(channel) }
   }, [])
 
   const enableNotify = async () => {
@@ -165,7 +213,7 @@ export function LunchPage({ t }) {
           <h2 style={{ color: t.text, fontWeight: 800, fontSize: 22 }}>🍱 午餐跟随</h2>
           <p style={{ color: t.textSub, fontSize: 13, marginTop: 4, opacity: 0.8 }}>今日组队 · 实时同步</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {!notifyOn && (
             <button onClick={enableNotify} style={{ padding: '10px 16px', borderRadius: 999, background: t.inputBg, color: t.textSub, fontSize: 13, fontWeight: 600, border: '1px solid ' + t.inputBorder }}>
               🔔 开启通知
