@@ -3,17 +3,7 @@
    ============================================ */
 
 // ── Default sample data ──
-const DEFAULT_ITEMS = [
-  { id: 1, name: '护照', category: '证件', qty: 1, note: '有效期确认', purchased: true, packed: false },
-  { id: 2, name: '签证',   category: '证件', qty: 1, note: '',          purchased: true,  packed: false },
-  { id: 3, name: 'T恤',    category: '衣物', qty: 5, note: '速干款',    purchased: true,  packed: false },
-  { id: 4, name: '牛仔裤', category: '衣物', qty: 2, note: '',          purchased: true,  packed: false },
-  { id: 5, name: '充电宝', category: '电子', qty: 1, note: '20000mAh',  purchased: true,  packed: false },
-  { id: 6, name: '转换插头', category: '电子', qty: 1, note: '万能型',  purchased: false, packed: false },
-  { id: 7, name: '洗发水', category: '洗漱', qty: 1, note: '旅行装',    purchased: false, packed: false },
-  { id: 8, name: '防晒霜', category: '洗漱', qty: 1, note: 'SPF50+',    purchased: true,  packed: false },
-  { id: 9, name: '感冒药', category: '药品', qty: 1, note: '',          purchased: false, packed: false },
-];
+const DEFAULT_ITEMS = [];;
 
 const CATEGORY_EMOJI = {
   '证件': '📋', '衣物': '👕', '洗漱': '🧴', '电子': '🔌', '药品': '💊', '其他': '📦'
